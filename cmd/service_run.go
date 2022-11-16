@@ -15,7 +15,7 @@ import (
 	"code.vegaprotocol.io/vega/paths"
 	coreversion "code.vegaprotocol.io/vega/version"
 	walletapi "code.vegaprotocol.io/vega/wallet/api"
-	walletnode "code.vegaprotocol.io/vega/wallet/api/node"
+	nodeapi "code.vegaprotocol.io/vega/wallet/api/node"
 	"code.vegaprotocol.io/vega/wallet/network"
 	netstore "code.vegaprotocol.io/vega/wallet/network/store/v1"
 	"code.vegaprotocol.io/vega/wallet/node"
@@ -255,7 +255,7 @@ func RunService(rf *RootFlags, f *RunServiceFlags) error {
 	jsonrpcLog := logger.Named("json-rpc")
 
 	logger.Debug("Initializing API v2 node selector...")
-	nodeSelector, err := buildNodeSelector(jsonrpcLog, cfg.API.GRPC)
+	nodeSelector, err := nodeapi.BuildRoundRobinSelectorWithRetryingNodes(jsonrpcLog, cfg.API.GRPC.Hosts, cfg.API.GRPC.Retries)
 	if err != nil {
 		logger.Error("Couldn't instantiate node API", zap.Error(err))
 		return fmt.Errorf("couldn't instantiate the node API: %w", err)
@@ -318,26 +318,4 @@ func waitSig(ctx context.Context, cancelFunc context.CancelFunc, log *zap.Logger
 			return
 		}
 	}
-}
-
-func buildNodeSelector(log *zap.Logger, nodesConfig network.GRPCConfig) (walletnode.Selector, error) {
-	if len(nodesConfig.Hosts) == 0 {
-		return nil, ErrNoHostSpecified
-	}
-
-	nodes := make([]walletnode.Node, 0, len(nodesConfig.Hosts))
-	for _, host := range nodesConfig.Hosts {
-		n, err := walletnode.NewRetryingGRPCNode(log.Named("grpc-node"), host, nodesConfig.Retries)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't initialize node for %q: %w", host, err)
-		}
-		nodes = append(nodes, n)
-	}
-
-	nodeSelector, err := walletnode.NewRoundRobinSelector(log.Named("round-robin-selector"), nodes...)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't instantiate round-robin node selector: %w", err)
-	}
-
-	return nodeSelector, nil
 }
