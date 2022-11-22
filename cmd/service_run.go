@@ -263,17 +263,15 @@ func RunService(rf *RootFlags, f *RunServiceFlags) error {
 	logger.Debug("API v2 node selector is initialized")
 
 	logger.Debug("Initializing API v2 client...")
-	apiV2, err := walletapi.ClientAPI(jsonrpcLog, walletStore, alwaysAgreeInteractor, nodeSelector)
+	sessions := walletapi.NewSessions()
+	apiV2, err := walletapi.ClientAPI(jsonrpcLog, walletStore, alwaysAgreeInteractor, nodeSelector, sessions)
 	if err != nil {
 		return fmt.Errorf("couldn't instantiate the JSON-RPC API: %w", err)
 	}
 	logger.Debug("API v2 client is initialized")
 
 	logger.Debug("Initializing the service...")
-	srv, err := service.NewService(logger.Named("api"), cfg, apiV2, handler, auth, forwarder, service.NewAutomaticConsentPolicy())
-	if err != nil {
-		return err
-	}
+	srv := service.NewService(logger.Named("api"), cfg, apiV2, handler, auth, forwarder, service.NewAutomaticConsentPolicy())
 	logger.Debug("The service is initialized")
 
 	go func() {
